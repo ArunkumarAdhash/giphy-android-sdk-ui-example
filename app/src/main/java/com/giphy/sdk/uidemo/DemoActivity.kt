@@ -7,8 +7,10 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import com.giphy.sdk.core.models.Media
+import com.giphy.sdk.ui.GPHContentType
 import com.giphy.sdk.ui.GPHSettings
 import com.giphy.sdk.ui.Giphy
+import com.giphy.sdk.ui.themes.GPHTheme
 import com.giphy.sdk.ui.themes.GridType
 import com.giphy.sdk.ui.views.GiphyDialogFragment
 import com.giphy.sdk.uidemo.feed.Author
@@ -30,7 +32,7 @@ class DemoActivity : AppCompatActivity() {
         val INVALID_KEY = "NOT_A_VALID_KEY"
     }
 
-    var settings = GPHSettings(gridType = GridType.waterfall)
+    var settings = GPHSettings(gridType = GridType.waterfall, useBlurredBackground = false, theme = GPHTheme.Light, stickerColumnCount = 3)
     var feedAdapter: MessageFeedAdapter? = null
     var messageItems = ArrayList<FeedDataItem>()
 
@@ -51,27 +53,24 @@ class DemoActivity : AppCompatActivity() {
             dialog.gifSelectionListener = getGifSelectionListener()
             dialog.show(supportFragmentManager, "gifs_dialog")
         }
-
-        emojiBtn.setOnClickListener {
-            val dialog = GiphyDialogFragment.newInstance(settings.copy(gridType = GridType.emoji))
-            dialog.gifSelectionListener = getGifSelectionListener()
-            dialog.show(supportFragmentManager, "emoji_dialog")
-        }
     }
 
     private fun getGifSelectionListener() = object : GiphyDialogFragment.GifSelectionListener {
-        override fun onDismissed() {
+        override fun onGifSelected(
+            media: Media,
+            searchTerm: String?,
+            selectedContentType: GPHContentType
+        ) {
+            Log.d(TAG, "onGifSelected")
+            messageItems.add(GifItem(media, Author.Me))
+            feedAdapter?.notifyItemInserted(messageItems.size - 1) }
+
+        override fun onDismissed(selectedContentType: GPHContentType) {
             Log.d(TAG, "onDismissed")
         }
 
         override fun didSearchTerm(term: String) {
             Log.d(TAG, "didSearchTerm $term")
-        }
-
-        override fun onGifSelected(media: Media) {
-            Log.d(TAG, "onGifSelected")
-            messageItems.add(GifItem(media, Author.Me))
-            feedAdapter?.notifyItemInserted(messageItems.size - 1)
         }
     }
 
@@ -91,12 +90,6 @@ class DemoActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         supportActionBar?.setDisplayShowHomeEnabled(true)
-    }
-
-    private fun openGridDemo(): Boolean {
-        val intent = Intent(this, GridActivity::class.java)
-        startActivity(intent)
-        return true
     }
 
     private fun openGridViewDemo(): Boolean {
@@ -128,9 +121,6 @@ class DemoActivity : AppCompatActivity() {
             messageItems.add(InvalidKeyItem(Author.GifBot))
         }
         feedAdapter = MessageFeedAdapter(messageItems)
-        settings.theme?.let {
-            feedAdapter?.theme = it.getThemeResources(this)
-        }
         messageFeed.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         messageFeed.adapter = feedAdapter
     }
@@ -144,9 +134,6 @@ class DemoActivity : AppCompatActivity() {
 
     private fun applyNewSettings(settings: GPHSettings) {
         this.settings = settings
-        settings.theme?.let {
-            feedAdapter?.theme = it.getThemeResources(this)
-        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

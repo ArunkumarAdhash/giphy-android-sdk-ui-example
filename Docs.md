@@ -4,7 +4,7 @@
 
 - Giphy UI SDK only supports projects that have been upgraded to [androidx](https://developer.android.com/jetpack/androidx/). 
 - Requires minSdkVersion 19
-- A Giphy API key from the [Giphy Developer Portal](https://developers.giphy.com/dashboard/?create=true).
+- A Giphy Android SDK key from the [Giphy Developer Portal](https://developers.giphy.com/dashboard/?create=true).
 
 ### Installation
 
@@ -12,17 +12,17 @@ Add the GIPHY Maven repository to your project's ```build.gradle``` file:
  
 ``` gradle
 maven {
-    url "http://giphy.bintray.com/giphy-sdk"
+    url "https://giphy.bintray.com/giphy-sdk"
 }
 ```
 
 Then add the GIPHY SDK dependency in the module ```build.gradle``` file:
 ```
-implementation 'com.giphy.sdk:ui:1.2.6'
+implementation 'com.giphy.sdk:ui:2.0.7'
 ``` 
     
 ### Basic Setup
-Here's a basic setup to make sure everything's working. Configure the GIPHY SDK with your API key.
+Here's a basic setup to make sure everything's working. Configure the GIPHY SDK with your API key. Apply for a new __Android SDK__ key. Please remember, you should use a separate key for every platform (Android, iOS, Web) you add our SDKs to.
 
 ```kotlin
 
@@ -31,11 +31,17 @@ class GiphyActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Giphy.configure(this, YOUR_API_KEY)
+        Giphy.configure(this, YOUR_ANDROID_SDK_KEY)
         
         GiphyDialogFragment.newInstance().show(supportFragmentManager, "giphy_dialog")
     }
 }
+```
+
+or pass your API key as a fragment argument to configure the GIPHY SDK right before opening `GiphyDialogFragment` :
+
+```kotlin
+val dialog = GiphyDialogFragment.newInstance(settings.copy(selectedContentType = contentType), YOUR_ANDROID_SDK_KEY)
 ```
 
 ### Custom UI
@@ -48,15 +54,15 @@ _Skip ahead to [Grid-Only section](#the-giphy-grid)_
 
 ### Templates: `GiphyDialogFragment`
 
-Configure the SDK with your API key. 
+Configure the SDK with your API key. Apply for a new __Android SDK__ key. Please remember, you should use a separate key for every platform (Android, iOS, Web) you add our SDKs to.
 
 ```kotlin
-    Giphy.configure(this, YOUR_API_KEY)
+    Giphy.configure(this, YOUR_ANDROID_SDK_KEY)
 ```
  
 Create a new instance of `GiphyDialogFragment`, which takes care of all the magic. Adjust the layout and theme by passing a `GPHSettings` object when creating the dialog.
  
-``` kotlin 
+```kotlin 
 val settings = GPHSettings(GridType.waterfall, GPHTheme.Dark)
 ``` 
 
@@ -65,6 +71,18 @@ Instantiate a `GiphyDialogFragment` with the settings object.
 ``` kotlin
 val gifsDialog = GiphyDialogFragment.newInstance(settings)
 ```
+
+#### `Fresco` initialization
+The SDK has special `Fresco` setup to support our use case, though this should not pose any conflicts with your use of `Fresco` outside of the GIPHY SDK. 
+You can use our `GiphyFrescoHandler`:
+``` kotlin
+Giphy.configure(context, YOUR_API_KEY, verificationMode, frescoHandler = object : GiphyFrescoHandler {
+                override fun handle(imagePipelineConfigBuilder: ImagePipelineConfig.Builder) {                    
+                }
+                override fun handle(okHttpClientBuilder: OkHttpClient.Builder) {                    
+                }
+}
+``` 
 
 #### `GPHSettings` properties
 
@@ -82,6 +100,11 @@ settings.gridType = GridType.waterfall
 <br> **Note**: Emoji only is not available for the carousel layout option. 
 ```kotlin
 settings.mediaTypeConfig = arrayOf(GPHContentType.gif, GPHContentType.sticker, GPHContentType.text, GPHContentType.emoji)
+```
+
+Set default `GPHContentType`:
+``` kotlin
+settings.selectedContentType = GPHContentType.emoji
 ```
 
 - **Recently Picked**: As of version `1.2.6` you can add an additional `GPHContentType` to you `mediaConfigs` array, called `GPHContentType.recents` which will automatically add a new tab with the recently picked GIFs and Stickers by the user. The tab will appear automatically if the user has picked any GIFs or Stickers.
@@ -110,6 +133,24 @@ settings.rating = RatingType.pg13
 settings.renditionType = RenditionType.fixedWidth
 settings.confirmationRenditionType = RenditionType.original 
 ```
+- **Checkered Background**: You can enable/disabled the checkered background for stickers and text media type.
+```kotlin
+settings.showCheckeredBackground = true
+```
+
+- **Blurred Background**: Use a translucent blurred background of the template container
+```
+settings.useBlurredBackground = true
+```
+- **Stickers Column Count**: Customise the number of columns for stickers (Accepted values between 2 and 4). We recommend using 3 columns for blurred mode.
+```kotlin
+settings.stickerColumnCount: Int = 3
+```
+
+- **Suggestions bar**: As of version `2.0.4` you can hide suggestions bar
+```kotlin
+settings.showSuggestionsBar = false
+```
 
 #### Presentation 
 Show your `GiphyDialogFragment` using the `SupportFragmentManager` and watch as the GIFs start flowin'.
@@ -119,10 +160,28 @@ gifsDialog.show(supportFragmentManager, "gifs_dialog")
 ```
 
 #### Events 
-To handle GIF selection you need to implement the `GifSelectionListener` interface.
+**Activity**
+To handle GIF selection you need to implement the `GifSelectionListener` interface. If you are calling the GiphyDialogFragment from an activity instance, it is recommended that your activity implements the interface `GifSelectionListener`. When using this approach, the Giphy dialog will check at creation time, if the activity is implementing the `GifSelectionListener` protocol and set the activity as a callback, if no other listeners are set programatically.
+``` kotlin
+ class DemoActivity : AppCompatActivity(), GiphyDialogFragment.GifSelectionListener {
+    override fun onGifSelected(media: Media, searchTerm: String?, selectedContentType: GPHContentType)
+        //Your user tapped a GIF
+    }
+
+    override fun onDismissed(selectedContentType: GPHContentType) {
+        //Your user dismissed the dialog without selecting a GIF
+    }
+    override fun didSearchTerm(term: String) {
+        //Callback for search terms
+    }
+}
+```
+
+**Fragment**
+- Option A: If you are calling the `GiphyDialogFragment` from a fragment context, you can also create a listener object to handle events.
 ``` kotlin
  giphyDialog.gifSelectionListener = object: GiphyDialogFragment.GifSelectionListener {
-    override fun onGifSelected(media: Media) {
+    fun onGifSelected(media: Media, searchTerm: String?)
         //Your user tapped a GIF
     }
 
@@ -139,10 +198,14 @@ To handle GIF selection you need to implement the `GifSelectionListener` interfa
 As the `GiphyDialogFragment` is based on `DialogFragment`, this means that if the dialog is recreated after a process death caused by the Android System, your listener will not have a change to get set again so gif delivery will fail for that session.
 To prevent such problems, we also implemented the android `setTargetFragment` API, to allow callbacks to be made reliably to the caller fragment in the event of process death.   
 
+- Option B: `GiphyDialogFragment` also implements support for the `setTargetFragment` API. If it detects a target fragment attached, **it will deliver the content to the target fragment and ignore the `GifSelectionListener`**. Response data will contain the `Media` object selected and the search term used to discover that `Media`.
 ```kotlin
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == REQUEST_GIFS && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_GIFS) {
             val media = data?.getParcelableExtra<Media>(GiphyDialogFragment.MEDIA_DELIVERY_KEY)
+            val keyword = data?.getStringExtra(GiphyDialogFragment.SEARCH_TERM_KEY)
+            //TODO: handle received data
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -175,10 +238,28 @@ Create a `GPHMediaView` to display the media. Optionaly, you can pass a renditio
 val mediaView = GPHMediaView(context)
 mediaView.setMedia(media, RenditionType.original)
 ```
-You can also populate a `GPHMediaView` with a media `id` like so: 
+You can populate a `GPHMediaView` with a media `id` like so:
 ```kotlin
-mediaView.setMediaWithId(media.id)  
+mediaView.setMediaWithId(media.id) { result, e ->                
+    e?.let {
+        //your code here
+    }
+}  
 ```
+Or just fetch media response for your needs
+```kotlin
+GPHCore.gifById(id) { result, e ->
+    gifView.setMedia(result?.data, RenditionType.original)
+    e?.let {
+        //your code here
+    }
+}
+```
+Use the media's aspectRatio property to size the view:
+```kotlin
+val aspectRatio = media.aspectRatio 
+```
+
 
 ## Grid-Only and `GiphyGridView`
 
